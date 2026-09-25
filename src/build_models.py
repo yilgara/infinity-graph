@@ -50,7 +50,9 @@ MARVEL_DIR = BASE / "data/marvel"
 OUT_DIR = BASE / "data/processed"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-GARBAGE_NODE_IDS = {"M"}  # single-letter malformed node, excluded from name matching
+MIN_MATCHABLE_ID_LEN = 2  # single-character bimodal IDs (e.g. 'M', 'A', 'T', 'P') are
+                          # excluded from name matching: any single letter is trivially
+                          # a prefix of nearly every longer name, causing false matches
 SPIDER_MAN_FIX = "SPIDER-MAN / PETER PARKER"  # present in edges, missing from nodes.csv
 MIN_SHARED_COMICS = 5  # matches shipped unimodal file's own curation cutoff
 
@@ -145,7 +147,7 @@ def build_projection(comic_to_heroes, hero_comics, min_shared_comics=MIN_SHARED_
 
 def match_names(unimodal_ids, bimodal_hero_ids):
     """Map each unimodal character Id to its bimodal hero ID equivalent."""
-    candidates_pool = [(h, h.lower()) for h in bimodal_hero_ids if h not in GARBAGE_NODE_IDS]
+    candidates_pool = [(h, h.lower()) for h in bimodal_hero_ids if len(h) >= MIN_MATCHABLE_ID_LEN]
     matched, unresolved = {}, []
     for uid in unimodal_ids:
         u_lower = uid.lower()

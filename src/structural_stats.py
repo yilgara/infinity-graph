@@ -2,7 +2,7 @@
 null model ensemble (z-scores), plus degree-distribution fitting (power law
 vs lognormal vs exponential via likelihood-ratio test).
 
-All models analyzed here are pre-built by build_projection.py / load_graphs.py
+All models analyzed here are pre-built by build_models.py
 (no model construction happens in this file):
   #1 shipped unimodal        (data/processed/unimodal.graphml)
   #2 our Jaccard (curated)   (data/processed/projection_jaccard.graphml)

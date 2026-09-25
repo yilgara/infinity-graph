@@ -1,15 +1,25 @@
-"""Phase 5: community detection, validated two ways --
+"""Phase 5: community detection, validated three ways --
   (1) modularity z-scored against the same degree-preserving null model
       ensemble used in Phase 3 (proves communities are real structure, not
-      an artifact every graph has), and
+      an artifact every graph has),
   (2) a small manually-curated ground-truth list of real Marvel teams
       (Avengers / X-Men / Fantastic Four), checking whether Louvain actually
-      groups them together.
+      groups them together, and
+  (3) characterizing EVERY detected community (not just the 3 ground-truth
+      ones) by its most prominent members, so any cluster can be checked
+      against real-world Marvel team knowledge, not only the ones we
+      thought to hand-pick in advance.
 
 Runs on all 3 models. Community detection uses unweighted Louvain (weight=
 None), matching Phase 3/4's approach, for direct comparability across the
 three networks and their null ensembles.
+
+--characterize-only skips the expensive null-model ensemble (Phase 3-style
+rewiring, the slow part) and just runs Louvain + community characterization
+-- useful for quickly iterating on the cluster-naming step without waiting
+~45 minutes for the full null ensemble again.
 """
+import argparse
 import sys
 import importlib.util
 from pathlib import Path
@@ -96,11 +106,31 @@ def null_modularity_distribution(G, n_runs=N_NULL_RUNS):
 
 
 def node_to_community(communities):
+    """IDs assigned in size-descending order, so community #0 is always the
+    largest -- keeps IDs consistent with characterize_communities()."""
     mapping = {}
-    for i, comm in enumerate(communities):
+    for i, comm in enumerate(sorted(communities, key=len, reverse=True)):
         for node in comm:
             mapping[node] = i
     return mapping
+
+
+def characterize_communities(G, communities, top_k=10, min_size=5):
+    """For every detected community (not just the ground-truth ones), list
+    its most prominent members by within-graph degree -- lets us judge
+    whether a cluster corresponds to a real, recognizable Marvel group
+    (a team, a villain roster, a franchise's supporting cast, etc.) even
+    when we didn't think to check for it in advance."""
+    degree = dict(G.degree())
+    sorted_comms = sorted(communities, key=len, reverse=True)
+    print(f"\n--- Community characterization: top {top_k} members by degree, "
+          f"for all {len(sorted_comms)} communities (size >= {min_size}) ---")
+    for i, comm in enumerate(sorted_comms):
+        if len(comm) < min_size:
+            continue
+        top_members = sorted(comm, key=lambda n: -degree[n])[:top_k]
+        names = ", ".join(f"{m} ({degree[m]})" for m in top_members)
+        print(f"\n  Community #{i} (size={len(comm)}): {names}")
 
 
 def validate_ground_truth(node_community, name_map=None):
@@ -130,6 +160,12 @@ def validate_ground_truth(node_community, name_map=None):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--characterize-only", action="store_true",
+                         help="Skip the slow null-model ensemble; just run Louvain + "
+                              "community characterization + ground-truth check")
+    args = parser.parse_args()
+
     networks = load_networks()
 
     bnodes, bedges, node_types = bm.load_bimodal()
@@ -148,14 +184,17 @@ if __name__ == "__main__":
         print(f"Louvain found {len(communities)} communities; sizes (top 10): {sizes[:10]}")
         print(f"Modularity: {modularity:.4f}")
 
-        # model #3's rewiring is ~7x denser/slower (Phase 3 precedent: 100 runs
-        # for #1/#2, 30 for #3 to keep runtime reasonable)
-        n_runs = 30 if name == "our_jaccard_full" else N_NULL_RUNS
-        print(f"Running {n_runs}-realization null ensemble for modularity z-score...")
-        null_mods = null_modularity_distribution(Gc, n_runs=n_runs)
-        mean, std = null_mods.mean(), null_mods.std()
-        z = (modularity - mean) / std if std > 0 else float("nan")
-        print(f"Null modularity: mean={mean:.4f}, std={std:.4f}, z={z:.2f}")
+        if not args.characterize_only:
+            # model #3's rewiring is ~7x denser/slower (Phase 3 precedent: 100 runs
+            # for #1/#2, 30 for #3 to keep runtime reasonable)
+            n_runs = 30 if name == "our_jaccard_full" else N_NULL_RUNS
+            print(f"Running {n_runs}-realization null ensemble for modularity z-score...")
+            null_mods = null_modularity_distribution(Gc, n_runs=n_runs)
+            mean, std = null_mods.mean(), null_mods.std()
+            z = (modularity - mean) / std if std > 0 else float("nan")
+            print(f"Null modularity: mean={mean:.4f}, std={std:.4f}, z={z:.2f}")
+
+        characterize_communities(Gc, communities)
 
         node_community = node_to_community(communities)
         name_map = gt_name_map if name in ("our_jaccard", "our_jaccard_full") else None

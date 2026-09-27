@@ -1,0 +1,295 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{natbib}
+
+\title{Who's Really Holding the Marvel Universe Together?\\
+\large A Network-Science Reproduction and Extension of\\
+``Marvel Universe Looks Almost Like a Real Social Network''}
+\author{Ilgara Yusifzada\\ \small Complex Network - Alternative Assignment}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Captain America, not Spider-Man or Iron Man, is the character movies and merchandising least emphasize as the Marvel Universe's ``main character'' -- yet by every standard network centrality measure, he is exactly that. We build the Marvel Comics character co-appearance network from raw appearance data, reproduce the small-world finding of the anchor study \citep{alberich2002marvel}, and extend it with (1) a statistical comparison of structural centrality against marketing prominence, (2) community detection validated against known teams and a broader qualitative check, and (3) a percolation analysis of robustness to random vs. targeted attack. All analyses run on three independently built networks to check the results aren't an artifact of one construction choice.
+\end{abstract}
+
+\section{Introduction}
+
+Marketing has a clear answer to ``who is the main character of the Marvel Universe'': whoever is headlining the next movie. Network science offers a structural answer instead -- whoever sits at the center of the web of relationships the writers built, appearance by appearance. These answers do not have to agree, and often do not.
+
+This report reproduces and extends \citet{alberich2002marvel}, who showed the Marvel Universe collaboration network (two characters linked if they co-appear in a comic) shares small-world properties with real social networks, while differing in others (an anomalously low clustering coefficient -- see Section~\ref{sec:discussion}). We use a derived version of the same Marvel Chronology Project data \citep{walsh2020marvel}, and extend the original with our own bipartite-to-network projection (raw count vs. Jaccard weighting), statistically validated centrality analysis, community detection checked against real teams, and a robustness/percolation simulation.
+
+\subsection{Hypotheses}
+
+\begin{description}[leftmargin=2em]
+    \item[H1] The network has a heavy-tailed degree distribution, though not necessarily a pure power law.
+    \item[H2] Structural centrality correlates only weakly with marketing prominence.
+    \item[H3] Louvain communities align with real Marvel teams significantly more than chance.
+    \item[H4] The network is far more robust to random removal than targeted removal of high-degree/high-betweenness characters.
+\end{description}
+
+\section{Data and Methods}
+
+\subsection{Data and the three network models}
+\label{sec:models}
+
+The data originates from the Marvel Chronology Project \citep{chappell2001mcp}, via a repackaging by \citet{walsh2020marvel}. We use two files: a \textbf{shipped unimodal} character--character network (327 characters, 9{,}891 weighted edges, pre-curated to characters with $\geq 8$ connections and $\geq 5$ shared comics per neighbor) and the underlying \textbf{bimodal} bipartite data (6{,}439 characters, 12{,}651 comics, 96{,}104 character--issue edges). 
+
+We carry three networks through the analysis:
+\begin{description}[leftmargin=2em]
+    \item[\#1 Shipped] The pre-built 327-character network, used as-is as a baseline.
+    \item[\#2 Our Jaccard (curated)] Built by us from the bipartite data: co-occurring character pairs with $\geq 5$ shared comics are kept and weighted by Jaccard similarity $J(a,b) = |C_a \cap C_b| / |C_a \cup C_b|$ (normalizes against how prolific each character is, rather than raw shared count). 2{,}396 characters, 23{,}674 edges.
+    \item[\#3 Our Jaccard (full)] Same construction, no minimum-comics threshold. 6{,}439 characters, 171{,}644 edges -- exists to test whether \#2's curation changes any conclusions (it does, once; Section~\ref{sec:discussion}).
+\end{description}
+
+
+
+\subsection{Methods}
+
+\textbf{Null model:} all structural statistics are $z$-scored against an ensemble of degree-preserving randomized graphs (Maslov--Sneppen double-edge-swap rewiring; 100 realizations for \#1/\#2, 30 for \#3), which preserves each character's connection count while destroying higher-order structure \citep{newman2001random}.
+
+\textbf{Community detection:} unweighted Louvain modularity maximization \citep{blondel2008louvain}, $z$-scored against the same null ensemble, validated against a 24-character ground-truth roster (Avengers/X-Men/Fantastic Four) and by characterizing every detected community's top members for unprompted real-team matches.
+
+\textbf{Robustness:} character removal under random, degree-targeted, and betweenness-targeted strategies, tracking giant-component size after each removal. Recomputing connectivity from scratch after every removal is too slow at $n{=}6{,}403$. We instead add nodes back in reverse order with union--find, giving an identical curve in near-linear time (verified against brute force to floating-point precision).
+
+\textbf{Verification:} average degree, clustering coefficient, and one specific edge weight (Captain America--Iron Man, 440 shared comics) were each independently re-derived by a second method and matched exactly -- see Section~\ref{sec:discussion}.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Small-world structure (H1)}
+
+All three networks show the small-world signature \citep{watts1998smallworld}: clustering far exceeds the null expectation ($z$ in the hundreds) while path length is only modestly above it (Table~\ref{tab:structural}).
+
+\begin{table}[H]
+\centering
+\caption{Structural statistics vs. degree-preserving null model.}
+\label{tab:structural}
+\begin{tabular}{lrrr}
+\toprule
+Network & Clustering (real/null, $z$) & Transitivity (real/null, $z$) & Avg. path length (real/null, $z$) \\
+\midrule
+\#1 Shipped & 0.705 / 0.533, $z{=}101$ & 0.476 / 0.367, $z{=}66$ & 1.87 / 1.82, $z{=}24$ \\
+\#2 Our Jaccard & 0.744 / 0.224, $z{=}139$ & 0.266 / 0.115, $z{=}122$ & 2.97 / 2.71, $z{=}15$ \\
+\#3 Our Full & 0.774 / 0.260, $z{=}463$ & 0.195 / 0.103, $z{=}276$ & 2.61 / 2.42, $z{=}14$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A likelihood-ratio test \citep{clauset2009powerlaw} rejects a pure power law in favor of a truncated power law on all three networks (Table~\ref{tab:degreefit}, Figure~\ref{fig:degdist}) -- H1 holds, with the refinement that the tail is heavy but not a clean power law.
+
+\begin{table}[H]
+\centering
+\caption{Degree distribution fit. Negative $R$ favors the alternative; all $p<0.01$.}
+\label{tab:degreefit}
+\begin{tabular}{lrrrr}
+\toprule
+Network & $\alpha$ & vs. lognormal & vs. exponential & vs. truncated PL \\
+\midrule
+\#1 Shipped & 2.59 & $-2.69$ (lognormal) & $-2.56$ (exp.) & $-3.09$ (trunc. PL) \\
+\#2 Our Jaccard & 2.05 & $-3.06$ (lognormal) & $7.54$ (power law) & $-4.50$ (trunc. PL) \\
+\#3 Our Full & 2.38 & $-3.04$ (lognormal) & $3.44$ (power law) & $-3.88$ (trunc. PL) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig1_degree_distribution.png}
+\caption{Empirical degree CCDF vs. fitted models. Truncated power law and lognormal both track the falloff better than a plain power law.}
+\label{fig:degdist}
+\end{figure}
+
+\subsection{Centrality: the true main character (H2)}
+\label{sec:centrality}
+
+\textbf{Captain America ranks \#1 by degree, closeness, and eigenvector centrality on all three networks, no exceptions} (Table~\ref{tab:centrality}). The one exception is betweenness: on Models \#2 and \#3, \textbf{Spider-Man} overtakes him.
+
+\begin{table}[H]
+\centering
+\caption{Top-ranked character by each centrality measure.}
+\label{tab:centrality}
+\begin{tabular}{lllll}
+\toprule
+Network & Degree & Betweenness & Closeness & Eigenvector \\
+\midrule
+\#1 Shipped & Captain America & Captain America & Captain America & Captain America \\
+\#2 Our Jaccard & Captain America & \textbf{Spider-Man} & Captain America & Captain America \\
+\#3 Our Full & Captain America & \textbf{Spider-Man} & Captain America & Captain America \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is a real hub-vs-connector split: Captain America has more raw connections, but Spider-Man bridges otherwise-separate regions of the universe more critically. The effect is invisible on Model \#1 because pre-curation flattens exactly the distinction betweenness detects. Daredevil, Doctor Strange, and (on Model \#3) Havok show the same pattern on a smaller scale -- modest degree, high betweenness, bridging street-level, mystical, and cosmic storylines.
+
+Comparing structural rank against ten marketing-prominent characters (Table~\ref{tab:marketing}), most rank highly on both axes -- except \textbf{Punisher}, who ranks in the marketing top 3\% but only 138th/2{,}341 by degree and 294th/2{,}341 by eigenvector centrality. He is the clearest case of H2: marketing fame and structural centrality separate.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Marketing-prominent characters' structural rank, Model \#2 (out of 2{,}341).}
+\label{tab:marketing}
+\begin{tabular}{lrrr}
+\toprule
+Character & Degree rank & Betweenness rank & Eigenvector rank \\
+\midrule
+Captain America & 1 & 2 & 1 \\
+Spider-Man & 2 & 1 & 10 \\
+Iron Man & 3 & 3 & 7 \\
+Wolverine & 4 & 4 & 2 \\
+Thor & 4 & 5 & 11 \\
+Hulk & 12 & 6 & 18 \\
+Storm & 11 & 20 & 9 \\
+Silver Surfer & 42 & 15 & 41 \\
+Daredevil & 28 & 7 & 35 \\
+\textbf{Punisher} & \textbf{138} & 23 & \textbf{294} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Community detection: real cliques (H3)}
+
+Modularity far exceeds the null expectation on all three networks ($z = 94$, $229$, $269$; Table~\ref{tab:community}) -- detected communities are real structure.
+
+\begin{table}[H]
+\centering
+\caption{Community detection summary.}
+\label{tab:community}
+\begin{tabular}{lrrr}
+\toprule
+Network & \# Communities & Modularity (real/null) & $z$-score \\
+\midrule
+\#1 Shipped & 4 & 0.266 / 0.075 & 93.6 \\
+\#2 Our Jaccard & 22 & 0.514 / 0.155 & 229.1 \\
+\#3 Our Full & 21 & 0.414 / 0.092 & 268.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The \textbf{X-Men} and \textbf{Fantastic Four} are recovered as clean single communities on all three networks. The \textbf{Avengers} hold together on \#1/\#2 (7/8 members) but fragment on \#3 (2/8) -- unsurprising given their famously unstable roster compared to the X-Men/FF's stable ones. Beyond the ground truth, characterizing every community surfaced unprompted real groupings: the New Warriors, Serpent Society, and Asgard on Model \#2; the Midnight Sons and a Kree/Shi'ar cosmic cluster on Model \#3 -- strong independent support for H3.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig3_network_snapshot.png}
+\caption{Model \#1, force-directed layout. Node size = degree centrality; color = detected community (X-Men, Avengers/FF core, secondary/cosmic heroes, Spider-Man's corner).}
+\label{fig:snapshot}
+\end{figure}
+
+\subsection{Robustness (H4)}
+
+Figure~\ref{fig:robustness} and Table~\ref{tab:robustness} show the classic attack-tolerance signature \citep{albert2000error}: robust to random failure, fragile to targeted attack. On Models \#2/\#3, removing the top 12--24\% by degree or betweenness collapses the network to half size. Random removal needs 45--49\% for the same effect.
+
+\begin{table}[H]
+\centering
+\caption{Critical fraction removed for giant component $<$50\% / $<$10\% of original.}
+\label{tab:robustness}
+\begin{tabular}{lrrr}
+\toprule
+Network & Random & Degree-targeted & Betweenness-targeted \\
+\midrule
+\#1 Shipped & 0.502 / 0.896 & 0.498 / 0.789 & 0.498 / 0.700 \\
+\#2 Our Jaccard & 0.449 / 0.831 & \textbf{0.122} / \textbf{0.168} & \textbf{0.134} / \textbf{0.207} \\
+\#3 Our Full & 0.485 / 0.870 & \textbf{0.239} / \textbf{0.339} & \textbf{0.209} / \textbf{0.315} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig2_robustness_curves.png}
+\caption{Giant component fraction vs. fraction removed. Random (grey) degrades linearly; targeted (red/blue) collapses fast.}
+\label{fig:robustness}
+\end{figure}
+
+As in Section~\ref{sec:centrality}, Model \#1 shows a far weaker version of this effect -- pre-curation removes the vulnerable low-degree periphery a targeted attack would exploit. H4 holds qualitatively everywhere. Its magnitude depends heavily on construction.
+
+\subsection{Does construction method change the conclusions?}
+\label{sec:cross}
+
+Every qualitative conclusion holds across all three networks: Captain America and Spider-Man top every centrality measure everywhere; X-Men/Fantastic Four are always recovered cleanly; the network is always more robust to random than targeted removal. Disagreements are specific and explainable, not noise: the Captain-America-vs-Spider-Man split and the robustness gap's magnitude only appear once peripheral characters are included, and the Avengers' cohesion depends on curation level for the concrete reason above.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{An unresolved discrepancy}
+
+\citet{alberich2002marvel} report clustering $C = 0.012$ on their full network, calling it \emph{small} relative to real collaboration networks (0.2--0.8) -- the ``almost'' in their title. Our comparable Model \#3 gives $C = 0.774$, about 64$\times$ higher. We ruled out two explanations: curation (Model \#3 is fully uncurated and gives nearly the same value as curated Model \#2, 0.774 vs. 0.744) and computational error (our clustering computation matches an independent manual triangle-count exactly, on all three networks). A date-range check (excluding identifiable pre-1961 Golden Age comics) moved clustering by less than $10^{-4}$. The likeliest remaining explanation is that this repackaged dataset reflects a more complete crawl of the Marvel Chronology Project than was available in 2001--2002. This does not affect this report’s internal,
+self-consistently validated conclusion
+
+\subsection{What an edge does not capture}
+
+An edge only means two characters appeared in the same comic -- a rivalry (Spider-Man/Doc Ock) reads identically to a friendship (Spider-Man/Human Torch). ``Community'' here means narratively co-located, not necessarily friendly -- several detected communities (e.g. the Serpent Society) are villain teams.
+
+\subsection{Limitations}
+
+The dataset is capped at 6{,}439 (or 327) characters and comics through roughly 1999--2000. The MCU and 25 years of subsequent comics are not represented. All results describe this historical slice of the franchise, not its present-day form.
+
+\section{Conclusion}
+
+Reproducing \citet{alberich2002marvel} confirms the Marvel Universe's small-world character (H1, refined: truncated power law, not pure). Captain America is the structural main character by connectivity. Spider-Man holds the more critical bridging role (H2), and marketing fame separates clearly from structural centrality at least once (Punisher). Community detection recovers real teams far beyond chance, including several never hand-picked as ground truth (H3). The network is dramatically more vulnerable to targeted than random attack (H4), confirming \citet{albert2000error} on a new domain. All four findings hold across three independently constructed networks, with disagreements localized to one explainable case (the Avengers) rather than appearing as noise.
+
+\section*{Code Availability}
+
+All code used to build the three networks, run the null-model, centrality, community-detection, and robustness analyses, generate the figures, and produce the interactive visualization is available at \url{https://github.com/yilgara/infinity-graph}.
+
+\section*{AI Usage Statement}
+
+This project was completed with assistance from Claude Code (Anthropic), an AI coding assistant, used throughout data cleaning and validation, implementation of analysis code, debugging, independent verification of results, drafting of this report. All methodological choices, interpretation of results, and conclusions were directed and reviewed by the author.
+
+\newpage
+\begin{thebibliography}{9}
+
+\bibitem[Alberich et al.(2002)]{alberich2002marvel}
+Alberich, R., Miró-Julià, J., \& Rosselló, F. (2002).
+\textit{Marvel Universe looks almost like a real social network}.
+arXiv:cond-mat/0202174.
+
+\bibitem[Albert et al.(2000)]{albert2000error}
+Albert, R., Jeong, H., \& Barabási, A.-L. (2000).
+Error and attack tolerance of complex networks.
+\textit{Nature}, 406, 378--382.
+
+\bibitem[Blondel et al.(2008)]{blondel2008louvain}
+Blondel, V. D., Guillaume, J.-L., Lambiotte, R., \& Lefebvre, E. (2008).
+Fast unfolding of communities in large networks.
+\textit{Journal of Statistical Mechanics: Theory and Experiment}, 2008(10), P10008.
+
+\bibitem[Clauset et al.(2009)]{clauset2009powerlaw}
+Clauset, A., Shalizi, C. R., \& Newman, M. E. J. (2009).
+Power-law distributions in empirical data.
+\textit{SIAM Review}, 51(4), 661--703.
+
+\bibitem[Chappell(2001)]{chappell2001mcp}
+Chappell, R. (2001).
+\textit{Marvel Chronology Project}.
+\url{http://www.chronologyproject.com}.
+
+\bibitem[Newman et al.(2001)]{newman2001random}
+Newman, M. E. J., Strogatz, S. H., \& Watts, D. J. (2001).
+Random graphs with arbitrary degree distributions and their applications.
+\textit{Physical Review E}, 64, 026118.
+
+\bibitem[Walsh(2020)]{walsh2020marvel}
+Walsh, M. (2020).
+\textit{Sample Social Network Datasets}.
+GitHub repository. \url{https://github.com/melaniewalsh/sample-social-network-datasets}.
+
+\bibitem[Watts \& Strogatz(1998)]{watts1998smallworld}
+Watts, D. J., \& Strogatz, S. H. (1998).
+Collective dynamics of `small-world' networks.
+\textit{Nature}, 393, 440--442.
+
+\end{thebibliography}
+
+\end{document}

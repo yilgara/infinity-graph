@@ -21,7 +21,7 @@
 \maketitle
 
 \begin{abstract}
-Captain America, not Spider-Man or Iron Man, is the character movies and merchandising least emphasize as the Marvel Universe's ``main character'' -- yet by every standard network centrality measure, he is exactly that. We build the Marvel Comics character co-appearance network from raw appearance data, reproduce the small-world finding of the anchor study \citep{alberich2002marvel}, and extend it with (1) a statistical comparison of structural centrality against marketing prominence, (2) community detection validated against known teams and a broader qualitative check, and (3) a percolation analysis of robustness to random vs. targeted attack. All analyses run on three independently built networks to check the results aren't an artifact of one construction choice.
+Captain America, not Spider-Man or Iron Man, is the character movies and merchandising least emphasize as the Marvel Universe's ``main character'' -- yet by every standard network centrality measure, he is exactly that. We build the Marvel Comics character co-appearance network from raw appearance data, reproduce the small-world finding of the anchor study \citep{alberich2002marvel}, and extend it with (1) a statistical comparison of structural centrality against marketing prominence, (2) community detection validated against known teams and a broader qualitative check, and (3) a robustness analysis spanning random attack, targeted attack, and individual single-point-of-failure criticality. All analyses run on three independently built networks to check the results aren't an artifact of one construction choice.
 \end{abstract}
 
 \section{Introduction}
@@ -36,7 +36,7 @@ This report reproduces and extends \citet{alberich2002marvel}, who showed the Ma
     \item[H1] The network has a heavy-tailed degree distribution, though not necessarily a pure power law.
     \item[H2] Structural centrality correlates only weakly with marketing prominence.
     \item[H3] Louvain communities align with real Marvel teams significantly more than chance.
-    \item[H4] The network is far more robust to random removal than targeted removal of high-degree/high-betweenness characters.
+    \item[H4] The network is far more robust to random removal than targeted removal — and no single character, however central, is a decisive point of failure.
 \end{description}
 
 \section{Data and Methods}
@@ -50,7 +50,7 @@ We carry three networks through the analysis:
 \begin{description}[leftmargin=2em]
     \item[\#1 Shipped] The pre-built 327-character network, used as-is as a baseline.
     \item[\#2 Our Jaccard (curated)] Built by us from the bipartite data: co-occurring character pairs with $\geq 5$ shared comics are kept and weighted by Jaccard similarity $J(a,b) = |C_a \cap C_b| / |C_a \cup C_b|$ (normalizes against how prolific each character is, rather than raw shared count). 2{,}396 characters, 23{,}674 edges.
-    \item[\#3 Our Jaccard (full)] Same construction, no minimum-comics threshold. 6{,}439 characters, 171{,}644 edges -- exists to test whether \#2's curation changes any conclusions (it does, once; Section~\ref{sec:discussion}).
+    \item[\#3 Our Jaccard (full)] Same construction, no minimum-comics threshold. 6{,}439 characters, 171{,}644 edges -- exists to test whether \#2's curation changes any conclusions.
 \end{description}
 
 
@@ -61,7 +61,7 @@ We carry three networks through the analysis:
 
 \textbf{Community detection:} unweighted Louvain modularity maximization \citep{blondel2008louvain}, $z$-scored against the same null ensemble, validated against a 24-character ground-truth roster (Avengers/X-Men/Fantastic Four) and by characterizing every detected community's top members for unprompted real-team matches.
 
-\textbf{Robustness:} character removal under random, degree-targeted, and betweenness-targeted strategies, tracking giant-component size after each removal. Recomputing connectivity from scratch after every removal is too slow at $n{=}6{,}403$. We instead add nodes back in reverse order with union--find, giving an identical curve in near-linear time (verified against brute force to floating-point precision).
+\textbf{Robustness:} character removal under random, degree-targeted, and betweenness-targeted strategies, tracking giant-component size after each removal. Recomputing connectivity from scratch after every removal is too slow at $n{=}6{,}403$. We instead add nodes back in reverse order with union--find, giving an identical curve in near-linear time (verified against brute force to floating-point precision). We separately compute articulation points (cut vertices) on each network's giant component -- characters whose \emph{individual} removal alone increases the number of connected components -- via NetworkX's linear-time implementation, and rank each by damage (nodes left outside the new largest component after removal).
 
 \textbf{Verification:} average degree, clustering coefficient, and one specific edge weight (Captain America--Iron Man, 440 shared comics) were each independently re-derived by a second method and matched exactly -- see Section~\ref{sec:discussion}.
 
@@ -214,10 +214,22 @@ Network & Random & Degree-targeted & Betweenness-targeted \\
 
 As in Section~\ref{sec:centrality}, Model \#1 shows a far weaker version of this effect -- pre-curation removes the vulnerable low-degree periphery a targeted attack would exploit. H4 holds qualitatively everywhere. Its magnitude depends heavily on construction.
 
+\subsection{Single points of failure}
+\label{sec:articulation}
+
+Table~\ref{tab:robustness} asks how the network degrades under a \emph{sequence} of removals. A different, complementary question is whether any \emph{single} character's removal alone fragments the network at all. A node is an articulation point (cut vertex) if removing it increases the number of connected components -- computed exactly via NetworkX's linear-time implementation, no need to test every node individually.
+
+\textbf{Model \#1 has zero articulation points}: no single character's removal disconnects anything, a direct consequence of its minimum degree of 8. Models \#2/\#3 do have cut vertices (99 and 52 respectively), but even the single worst one barely dents the network -- 1.03\% of Model \#2 (Havok, degree 198) and 0.23\% of Model \#3 (Wolverine, degree 1{,}382).
+
+Strikingly, \textbf{Captain America is only the 8th-worst single point of failure on both Models \#2 and \#3}, despite topping degree, closeness, and eigenvector centrality everywhere (Section~\ref{sec:centrality}). Being a cut vertex is not about how many connections a character has, but whether they are the \emph{only} path to some small pocket of the network -- Captain America's connections are so densely embedded in the well-connected core that alternate routes around him always exist, while a more modestly-connected bridge character (Havok, Wolverine) can be the sole link to a small peripheral cluster. Spider-Man shows the same construction-sensitivity seen elsewhere in this report: 2nd-worst cut vertex on Model \#2, but 48th of 52 on Model \#3 -- another case where a finding depends on curation level rather than holding universally.
+
+In short: aggregate centrality shows who matters \emph{on average}, not who is irreplaceable. 
+
+
 \subsection{Does construction method change the conclusions?}
 \label{sec:cross}
 
-Every qualitative conclusion holds across all three networks: Captain America and Spider-Man top every centrality measure everywhere; X-Men/Fantastic Four are always recovered cleanly; the network is always more robust to random than targeted removal. Disagreements are specific and explainable, not noise: the Captain-America-vs-Spider-Man split and the robustness gap's magnitude only appear once peripheral characters are included, and the Avengers' cohesion depends on curation level for the concrete reason above.
+Every qualitative conclusion holds across all three networks: Captain America and Spider-Man top every centrality measure everywhere; X-Men/Fantastic Four are always recovered cleanly; the network is always more robust to random than targeted removal. Disagreements are specific and explainable, not noise: the Captain-America-vs-Spider-Man split and the robustness gap's magnitude only appear once peripheral characters are included, the Avengers' cohesion depends on curation level for the concrete reason above, and Spider-Man's single-point-of-failure ranking swings from 2nd-worst (Model \#2) to 48th of 52 (Model \#3, Section~\ref{sec:articulation}).
 
 \section{Discussion}
 \label{sec:discussion}
@@ -237,15 +249,21 @@ The dataset is capped at 6{,}439 (or 327) characters and comics through roughly 
 
 \section{Conclusion}
 
-Reproducing \citet{alberich2002marvel} confirms the Marvel Universe's small-world character (H1, refined: truncated power law, not pure). Captain America is the structural main character by connectivity. Spider-Man holds the more critical bridging role (H2), and marketing fame separates clearly from structural centrality at least once (Punisher). Community detection recovers real teams far beyond chance, including several never hand-picked as ground truth (H3). The network is dramatically more vulnerable to targeted than random attack (H4), confirming \citet{albert2000error} on a new domain. All four findings hold across three independently constructed networks, with disagreements localized to one explainable case (the Avengers) rather than appearing as noise.
+Reproducing \citet{alberich2002marvel} confirms the Marvel Universe's small-world character (H1, refined: truncated power law, not pure). Captain America is the structural main character by connectivity. Spider-Man holds the more critical bridging role (H2), and marketing fame separates clearly from structural centrality at least once (Punisher). Community detection recovers real teams far beyond chance, including several never hand-picked as ground truth (H3). The network is dramatically more vulnerable to targeted than random attack (H4), confirming \citet{albert2000error} on a new domain -- yet no single character, however central, is a decisive point of failure: Captain America ranks only 8th by single-removal damage on Models \#2/\#3, behind more modestly-connected bridge characters. All four findings hold across three independently constructed networks, with disagreements localized to explainable cases (the Avengers' community cohesion, Spider-Man's swinging single-point-of-failure rank) rather than appearing as noise.
 
 \section*{Code Availability}
 
 All code used to build the three networks, run the null-model, centrality, community-detection, and robustness analyses, generate the figures, and produce the interactive visualization is available at \url{https://github.com/yilgara/infinity-graph}.
 
-\section*{AI Usage Statement}
+\section*{AI Use Statement}
 
-This project was completed with assistance from Claude Code (Anthropic), an AI coding assistant, used throughout data cleaning and validation, implementation of analysis code, debugging, independent verification of results, drafting of this report. All methodological choices, interpretation of results, and conclusions were directed and reviewed by the author.
+I used the following AI tool: Claude Code (Anthropic). This tool was used for the following purpose(s): data cleaning and validation, implementation of all analysis code, debugging, independent verification of results, and drafting of this report. I reviewed and verified all generated content and take full responsibility for the submitted work.
+
+\section*{Plagiarism Declaration}
+
+I declare that this assignment is my own work. All sources,
+references, quotations, figures, code fragments, and other materials originating from the work
+of others have been properly cited and acknowledged.
 
 \newpage
 \begin{thebibliography}{9}

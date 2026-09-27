@@ -1,0 +1,955 @@
+<title>Marvel Constellation</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d14;
+    --surface: #12151f;
+    --surface-2: #171a26;
+    --ink: #e8eaf2;
+    --ink-dim: #8890a8;
+    --ink-faint: #565d75;
+    --border: #232838;
+    --accent: #ffb648;
+    --accent-soft: #3a2f1a;
+    --danger: #f87171;
+    --danger-soft: #3a1f1f;
+
+    --c0: #7dd3fc; /* Avengers / Fantastic Four */
+    --c1: #f87171; /* X-Men */
+    --c2: #c084fc; /* Secondary / cosmic */
+    --c3: #4ade80; /* Spider-Man's corner */
+
+    --font-display: 'Sora', system-ui, sans-serif;
+    --font-body: 'Manrope', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---------- header ---------- */
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 20px;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand h1 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  .brand p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hud {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    font-family: var(--font-mono);
+  }
+  .hud-stat { text-align: right; }
+  .hud-stat .label {
+    font-size: 10px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: var(--font-body);
+  }
+  .hud-stat .value {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .hud-stat .value.warn { color: var(--danger); }
+  .hud-stat .value.ok { color: var(--accent); }
+
+  /* ---------- layout ---------- */
+  main {
+    flex: 1 1 auto;
+    display: flex;
+    min-height: 0;
+  }
+  #canvas-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    min-width: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,182,72,0.04), transparent 60%),
+      var(--bg);
+  }
+  #graph { display: block; width: 100%; height: 100%; cursor: grab; }
+  #graph.dragging { cursor: grabbing; }
+
+  #hint {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    pointer-events: none;
+    max-width: 320px;
+    line-height: 1.5;
+  }
+
+  aside {
+    flex: 0 0 340px;
+    max-width: 340px;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .panel {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .panel h2 {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    margin: 0 0 10px;
+  }
+
+  /* search */
+  .search-box { position: relative; }
+  .search-box input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    padding: 9px 10px;
+    outline: none;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 20;
+    display: none;
+  }
+  .search-results.open { display: block; }
+  .search-result {
+    padding: 8px 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover { background: var(--surface-2); }
+  .search-result .deg { color: var(--ink-faint); font-family: var(--font-mono); font-size: 11px; }
+
+  .removed-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    border-radius: 999px;
+    padding: 4px 8px 4px 10px;
+    font-size: 11.5px;
+    font-family: var(--font-mono);
+  }
+  .chip button {
+    background: none;
+    border: none;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+    opacity: 0.7;
+  }
+  .chip button:hover { opacity: 1; }
+  .empty-note { font-size: 12px; color: var(--ink-faint); font-style: italic; }
+
+  /* attack controls */
+  .strategy-row { display: flex; gap: 6px; margin-bottom: 10px; }
+  .strategy-btn {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink-dim);
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 7px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .strategy-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  .batch-row { display: flex; gap: 8px; align-items: center; }
+  .batch-row input[type=number] {
+    width: 56px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 7px 6px;
+    text-align: center;
+  }
+  .btn {
+    background: var(--accent);
+    color: #201400;
+    border: none;
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 12.5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    flex: 1;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn:active { filter: brightness(0.95); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+  }
+  .btn-ghost:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  /* legend */
+  .legend-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 12.5px;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; margin-top: 3px; }
+  .legend-row .name { font-weight: 600; }
+  .legend-row .count { color: var(--ink-faint); font-family: var(--font-mono); font-size: 11px; }
+
+  /* inspector */
+  #inspector.empty { color: var(--ink-faint); font-size: 12.5px; font-style: italic; }
+  .insp-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; margin-bottom: 8px; line-height: 1.3; }
+  .insp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .insp-stat .label { font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+  .insp-stat .value { font-family: var(--font-mono); font-size: 15px; font-weight: 600; }
+  .insp-actions { display: flex; gap: 8px; }
+  .insp-actions button {
+    flex: 1;
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 7px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+  }
+  .insp-remove { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+  .insp-restore { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .insp-clear { background: transparent; color: var(--ink-dim); }
+
+  footer {
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+
+  @media (max-width: 820px) {
+    main { flex-direction: column; overflow-y: auto; }
+    #canvas-wrap { height: 52vh; flex: 0 0 auto; }
+    aside { flex: 1 1 auto; max-width: none; border-left: none; border-top: 1px solid var(--border); }
+    .hud { gap: 14px; }
+    .hud-stat .value { font-size: 16px; }
+    .brand p { display: none; }
+  }
+</style>
+
+<header>
+  <div class="brand">
+    <h1>Marvel Constellation</h1>
+    <p>327-character co-appearance network &middot; shipped dataset</p>
+  </div>
+  <div class="hud">
+    <div class="hud-stat">
+      <div class="label">Giant component</div>
+      <div class="value" id="hud-giant">100%</div>
+    </div>
+    <div class="hud-stat">
+      <div class="label">Removed</div>
+      <div class="value" id="hud-removed">0</div>
+    </div>
+    <div class="hud-stat">
+      <div class="label">Orphaned</div>
+      <div class="value" id="hud-orphaned">0</div>
+    </div>
+    <div class="hud-stat">
+      <div class="label">Connected</div>
+      <div class="value" id="hud-connected">327 / 327</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="canvas-wrap">
+    <canvas id="graph"></canvas>
+    <div id="hint">Drag to pan &middot; scroll to zoom &middot; click a character to inspect and remove them</div>
+  </div>
+
+  <aside>
+    <div class="panel">
+      <h2>Inspect a character</h2>
+      <div id="inspector" class="empty">Click any node, or search below, to inspect a character and remove them from the network.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Remove by name</h2>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Search 327 characters&hellip;" autocomplete="off">
+        <div class="search-results" id="search-results"></div>
+      </div>
+      <div class="removed-list" id="removed-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Simulate an attack</h2>
+      <div class="strategy-row" id="strategy-row">
+        <button class="strategy-btn active" data-strategy="degree">By connections</button>
+        <button class="strategy-btn" data-strategy="betweenness">By bridging role</button>
+        <button class="strategy-btn" data-strategy="random">Random</button>
+      </div>
+      <div class="batch-row">
+        <span style="font-size:12px;color:var(--ink-dim);">Remove next</span>
+        <input type="number" id="batch-n" value="10" min="1" max="327">
+        <button class="btn" id="batch-go">Go</button>
+      </div>
+      <button class="btn-ghost" id="reset-btn">Reset network</button>
+    </div>
+
+    <div class="panel">
+      <h2>Detected communities</h2>
+      <div id="legend"></div>
+    </div>
+  </aside>
+</main>
+
+<footer>Data: shipped unimodal network (327 characters, 9,891 co-appearance edges) &middot; communities via Louvain modularity &middot; giant component recomputed live on every removal</footer>
+
+<script>
+const DATA = __GRAPH_DATA__;
+</script>
+<script>
+(function () {
+  "use strict";
+
+  const nodesRaw = DATA.nodes;
+  const linksRaw = DATA.links;
+  const N = nodesRaw.length;
+
+  const COMM_COLORS = ['#7dd3fc', '#f87171', '#c084fc', '#4ade80'];
+  const COMM_NAMES = [
+    'Avengers / Fantastic Four core',
+    'X-Men',
+    'Secondary & cosmic heroes',
+    "Spider-Man's corner"
+  ];
+
+  const byId = new Map();
+  nodesRaw.forEach(n => byId.set(n.id, n));
+
+  const neighbors = new Map();
+  nodesRaw.forEach(n => neighbors.set(n.id, new Set()));
+  linksRaw.forEach(l => {
+    neighbors.get(l.source).add(l.target);
+    neighbors.get(l.target).add(l.source);
+  });
+
+  const degreeOrder = [...nodesRaw].sort((a, b) => b.degree - a.degree).map(n => n.id);
+  const betweennessOrder = [...nodesRaw].sort((a, b) => b.betweenness - a.betweenness).map(n => n.id);
+  let randomOrder = null;
+  function shuffledOrder() {
+    const arr = nodesRaw.map(n => n.id);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // ---------- state ----------
+  const removed = new Set();
+  let selectedId = null;
+  let activeStrategy = 'degree';
+  let hoverId = null;
+
+  // set of node ids currently in the giant component; everyone else who
+  // hasn't been manually removed is "orphaned" -- cut off as a side effect
+  let giantComponentSet = new Set(nodesRaw.map(n => n.id));
+
+  function computeGiantComponent() {
+    const visited = new Set();
+    let bestSet = new Set();
+    for (const n of nodesRaw) {
+      if (removed.has(n.id) || visited.has(n.id)) continue;
+      const compSet = new Set();
+      const stack = [n.id];
+      visited.add(n.id);
+      while (stack.length) {
+        const cur = stack.pop();
+        compSet.add(cur);
+        for (const nb of neighbors.get(cur)) {
+          if (!removed.has(nb) && !visited.has(nb)) {
+            visited.add(nb);
+            stack.push(nb);
+          }
+        }
+      }
+      if (compSet.size > bestSet.size) bestSet = compSet;
+    }
+    return bestSet;
+  }
+
+  function refreshHud() {
+    const totalRemaining = N - removed.size;
+    giantComponentSet = totalRemaining > 0 ? computeGiantComponent() : new Set();
+    const giant = giantComponentSet.size;
+    const pct = Math.round((giant / N) * 100);
+    const hudGiant = document.getElementById('hud-giant');
+    hudGiant.textContent = pct + '%';
+    hudGiant.className = 'value ' + (pct < 50 ? 'warn' : 'ok');
+    document.getElementById('hud-removed').textContent = removed.size;
+    const orphaned = N - removed.size - giant;
+    const hudOrphaned = document.getElementById('hud-orphaned');
+    hudOrphaned.textContent = orphaned;
+    hudOrphaned.className = 'value' + (orphaned > 0 ? ' warn' : '');
+    document.getElementById('hud-connected').textContent = giant + ' / ' + N;
+  }
+
+  function renderRemovedList() {
+    const list = document.getElementById('removed-list');
+    if (removed.size === 0) {
+      list.innerHTML = '<span class="empty-note">No one removed yet.</span>';
+      return;
+    }
+    list.innerHTML = '';
+    [...removed].forEach(id => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = '<span>' + shortName(id) + '</span>';
+      const btn = document.createElement('button');
+      btn.textContent = '✕';
+      btn.title = 'Restore ' + id;
+      btn.addEventListener('click', () => toggleRemoved(id));
+      chip.appendChild(btn);
+      list.appendChild(chip);
+    });
+  }
+
+  function shortName(id) {
+    return id.length > 22 ? id.slice(0, 21) + '…' : id;
+  }
+
+  function toggleRemoved(id) {
+    if (removed.has(id)) removed.delete(id);
+    else removed.add(id);
+    refreshHud();
+    renderRemovedList();
+    renderInspector();
+  }
+
+  function renderInspector() {
+    const box = document.getElementById('inspector');
+    if (!selectedId) {
+      box.className = 'empty';
+      box.innerHTML = 'Click any node, or search below, to inspect a character and remove them from the network.';
+      return;
+    }
+    const n = byId.get(selectedId);
+    const isRemoved = removed.has(selectedId);
+    const degRank = degreeOrder.indexOf(selectedId) + 1;
+    const betRank = betweennessOrder.indexOf(selectedId) + 1;
+    box.className = '';
+    box.innerHTML =
+      '<div class="insp-name">' + selectedId + '</div>' +
+      '<div class="insp-stats">' +
+        '<div class="insp-stat"><div class="label">Connections</div><div class="value">' + n.degree + '</div></div>' +
+        '<div class="insp-stat"><div class="label">Degree rank</div><div class="value">#' + degRank + '</div></div>' +
+        '<div class="insp-stat"><div class="label">Bridging score</div><div class="value">' + n.betweenness.toFixed(3) + '</div></div>' +
+        '<div class="insp-stat"><div class="label">Bridging rank</div><div class="value">#' + betRank + '</div></div>' +
+      '</div>' +
+      '<div class="insp-actions">' +
+        (isRemoved
+          ? '<button class="insp-restore" id="insp-toggle">Restore to network</button>'
+          : '<button class="insp-remove" id="insp-toggle">Remove from network</button>') +
+        '<button class="insp-clear" id="insp-clear">Deselect</button>' +
+      '</div>';
+    document.getElementById('insp-toggle').addEventListener('click', () => toggleRemoved(selectedId));
+    document.getElementById('insp-clear').addEventListener('click', () => { selectedId = null; renderInspector(); });
+  }
+
+  function renderLegend() {
+    const counts = [0, 0, 0, 0];
+    nodesRaw.forEach(n => counts[n.community]++);
+    const legend = document.getElementById('legend');
+    legend.innerHTML = '';
+    COMM_NAMES.forEach((name, i) => {
+      const row = document.createElement('div');
+      row.className = 'legend-row';
+      row.innerHTML =
+        '<div class="legend-dot" style="background:' + COMM_COLORS[i] + '"></div>' +
+        '<div><div class="name">' + name + '</div><div class="count">' + counts[i] + ' characters</div></div>';
+      legend.appendChild(row);
+    });
+
+    const note = document.createElement('div');
+    note.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11.5px;color:var(--ink-dim);line-height:1.6;';
+    note.innerHTML =
+      '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#f87171;text-align:center;line-height:9px;color:#0b0d14;font-size:8px;margin-right:6px;">&times;</span>Removed by you<br>' +
+      '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1.5px dashed #9ba3c2;margin-right:6px;"></span>Orphaned &ndash; cut off from the main network as a side effect';
+    legend.appendChild(note);
+  }
+
+  // ---------- search ----------
+  const searchInput = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim().toLowerCase();
+    if (!q) { searchResults.classList.remove('open'); return; }
+    const matches = nodesRaw
+      .filter(n => n.id.toLowerCase().includes(q))
+      .sort((a, b) => b.degree - a.degree)
+      .slice(0, 12);
+    searchResults.innerHTML = '';
+    if (matches.length === 0) {
+      searchResults.innerHTML = '<div class="search-result"><span>No matches</span></div>';
+    } else {
+      matches.forEach(n => {
+        const row = document.createElement('div');
+        row.className = 'search-result';
+        row.innerHTML = '<span>' + n.id + '</span><span class="deg">' + n.degree + ' links</span>';
+        row.addEventListener('click', () => {
+          selectedId = n.id;
+          renderInspector();
+          centerOn(n.id);
+          searchInput.value = '';
+          searchResults.classList.remove('open');
+        });
+        searchResults.appendChild(row);
+      });
+    }
+    searchResults.classList.add('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.remove('open');
+    }
+  });
+
+  // ---------- attack simulation ----------
+  document.querySelectorAll('.strategy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.strategy-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeStrategy = btn.dataset.strategy;
+      if (activeStrategy === 'random') randomOrder = shuffledOrder();
+    });
+  });
+
+  document.getElementById('batch-go').addEventListener('click', () => {
+    const n = Math.max(1, Math.min(327, parseInt(document.getElementById('batch-n').value, 10) || 10));
+    let order;
+    if (activeStrategy === 'degree') order = degreeOrder;
+    else if (activeStrategy === 'betweenness') order = betweennessOrder;
+    else { if (!randomOrder) randomOrder = shuffledOrder(); order = randomOrder; }
+
+    let added = 0;
+    for (const id of order) {
+      if (added >= n) break;
+      if (!removed.has(id)) { removed.add(id); added++; }
+    }
+    refreshHud();
+    renderRemovedList();
+    renderInspector();
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    removed.clear();
+    selectedId = null;
+    randomOrder = null;
+    refreshHud();
+    renderRemovedList();
+    renderInspector();
+  });
+
+  // ---------- canvas + force simulation ----------
+  const canvas = document.getElementById('graph');
+  const ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('canvas-wrap');
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let width, height;
+
+  function resize() {
+    width = wrap.clientWidth;
+    height = wrap.clientHeight;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+  }
+  window.addEventListener('resize', resize);
+
+  const maxDeg = Math.max(...nodesRaw.map(n => n.degree));
+  const minDeg = Math.min(...nodesRaw.map(n => n.degree));
+  function nodeRadius(n) {
+    const t = (n.degree - minDeg) / (maxDeg - minDeg);
+    return 2.6 + t * 9;
+  }
+
+  const simNodes = nodesRaw.map(n => {
+    const ang = Math.random() * Math.PI * 2, rad = Math.random() * 400;
+    return { ...n, x: Math.cos(ang) * rad, y: Math.sin(ang) * rad, fx: 0, fy: 0 };
+  });
+  const simById = new Map(simNodes.map(n => [n.id, n]));
+  const simLinks = linksRaw.map(l => ({ source: simById.get(l.source), target: simById.get(l.target), weight: l.weight }));
+
+  // Fruchterman-Reingold layout: temperature-capped displacement per tick,
+  // numerically stable (no velocity/momentum to diverge, unlike a naive
+  // spring simulation).
+  const AREA = 900;
+  const K = Math.sqrt((AREA * AREA) / simNodes.length); // optimal inter-node distance
+  let alpha = 1;
+  const alphaDecay = 1 - Math.pow(0.001, 1 / 300);
+  const alphaMin = 0.015;
+
+  function tick() {
+    if (alpha < alphaMin) return;
+
+    for (const n of simNodes) { n.fx = 0; n.fy = 0; }
+
+    // repulsion, all pairs (O(n^2) fine at n=327)
+    for (let i = 0; i < simNodes.length; i++) {
+      const a = simNodes[i];
+      for (let j = i + 1; j < simNodes.length; j++) {
+        const b = simNodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 1) d = 1;
+        const force = (K * K) / d;
+        const fx = (dx / d) * force, fy = (dy / d) * force;
+        a.fx += fx; a.fy += fy;
+        b.fx -= fx; b.fy -= fy;
+      }
+    }
+    // attraction along edges
+    for (const l of simLinks) {
+      let dx = l.target.x - l.source.x, dy = l.target.y - l.source.y;
+      let d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 1) d = 1;
+      const force = (d * d) / K;
+      const fx = (dx / d) * force, fy = (dy / d) * force;
+      l.source.fx += fx; l.source.fy += fy;
+      l.target.fx -= fx; l.target.fy -= fy;
+    }
+    // gentle pull to center + apply, capped by a cooling "temperature"
+    const temp = Math.max(0.6, 26 * alpha);
+    for (const n of simNodes) {
+      n.fx += -n.x * 0.012;
+      n.fy += -n.y * 0.012;
+      const d = Math.sqrt(n.fx * n.fx + n.fy * n.fy) || 1;
+      const capped = Math.min(d, temp);
+      n.x += (n.fx / d) * capped;
+      n.y += (n.fy / d) * capped;
+    }
+    alpha += (0 - alpha) * alphaDecay;
+  }
+
+  // ---------- camera (pan/zoom) ----------
+  let camX = 0, camY = 0, camScale = 1;
+  let dragging = false, dragStartX, dragStartY, camStartX, camStartY;
+  let didDrag = false;
+
+  canvas.addEventListener('mousedown', (e) => {
+    dragging = true; didDrag = false;
+    canvas.classList.add('dragging');
+    dragStartX = e.clientX; dragStartY = e.clientY;
+    camStartX = camX; camStartY = camY;
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) { handleHover(e); return; }
+    const dx = e.clientX - dragStartX, dy = e.clientY - dragStartY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) didDrag = true;
+    camX = camStartX + dx; camY = camStartY + dy;
+  });
+  window.addEventListener('mouseup', () => { dragging = false; canvas.classList.remove('dragging'); });
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = Math.pow(1.0015, -e.deltaY);
+    camScale = Math.max(0.25, Math.min(4, camScale * factor));
+  }, { passive: false });
+
+  function screenToWorld(sx, sy) {
+    return { x: (sx - width / 2 - camX) / camScale, y: (sy - height / 2 - camY) / camScale };
+  }
+
+  function nodeAt(sx, sy) {
+    const p = screenToWorld(sx, sy);
+    let best = null, bestD = Infinity;
+    for (const n of simNodes) {
+      const dx = n.x - p.x, dy = n.y - p.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      const r = nodeRadius(n) + 3;
+      if (d < r && d < bestD) { bestD = d; best = n; }
+    }
+    return best;
+  }
+
+  function handleHover(e) {
+    const rect = canvas.getBoundingClientRect();
+    const n = nodeAt(e.clientX - rect.left, e.clientY - rect.top);
+    hoverId = n ? n.id : null;
+    canvas.style.cursor = n ? 'pointer' : (dragging ? 'grabbing' : 'grab');
+  }
+
+  canvas.addEventListener('click', (e) => {
+    if (didDrag) return;
+    const rect = canvas.getBoundingClientRect();
+    const n = nodeAt(e.clientX - rect.left, e.clientY - rect.top);
+    selectedId = n ? n.id : null;
+    renderInspector();
+  });
+
+  // touch support
+  let lastTouchDist = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      dragging = true; didDrag = false;
+      dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+      camStartX = camX; camStartY = camY;
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1 && dragging) {
+      const dx = e.touches[0].clientX - dragStartX, dy = e.touches[0].clientY - dragStartY;
+      if (Math.abs(dx) + Math.abs(dy) > 3) didDrag = true;
+      camX = camStartX + dx; camY = camStartY + dy;
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      if (lastTouchDist) camScale = Math.max(0.25, Math.min(4, camScale * (dist / lastTouchDist)));
+      lastTouchDist = dist;
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) {
+      dragging = false; lastTouchDist = null;
+      if (!didDrag) {
+        const rect = canvas.getBoundingClientRect();
+        const t = e.changedTouches[0];
+        const n = nodeAt(t.clientX - rect.left, t.clientY - rect.top);
+        selectedId = n ? n.id : null;
+        renderInspector();
+      }
+    }
+  });
+
+  function centerOn(id) {
+    const n = simById.get(id);
+    if (!n) return;
+    camX = -n.x * camScale;
+    camY = -n.y * camScale;
+    camScale = Math.max(camScale, 1.4);
+  }
+
+  // ---------- draw ----------
+  function draw() {
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, width, height);
+    ctx.translate(width / 2 + camX, height / 2 + camY);
+    ctx.scale(camScale, camScale);
+
+    const activeSet = selectedId ? neighbors.get(selectedId) : (hoverId ? neighbors.get(hoverId) : null);
+    const focusId = selectedId || hoverId;
+
+    // edges
+    for (const l of simLinks) {
+      const sRemoved = removed.has(l.source.id), tRemoved = removed.has(l.target.id);
+      const isFocusEdge = focusId && (l.source.id === focusId || l.target.id === focusId);
+      let alphaE;
+      if (sRemoved || tRemoved) alphaE = 0.02;
+      else if (focusId) alphaE = isFocusEdge ? 0.55 : 0.02;
+      else alphaE = 0.06;
+      ctx.strokeStyle = isFocusEdge ? 'rgba(255,182,72,' + alphaE + ')' : 'rgba(232,234,242,' + alphaE + ')';
+      ctx.lineWidth = isFocusEdge ? 1.1 : 0.6;
+      ctx.beginPath();
+      ctx.moveTo(l.source.x, l.source.y);
+      ctx.lineTo(l.target.x, l.target.y);
+      ctx.stroke();
+    }
+
+    // nodes
+    for (const n of simNodes) {
+      const isRemoved = removed.has(n.id);
+      const isOrphaned = !isRemoved && !giantComponentSet.has(n.id);
+      const isFocus = n.id === focusId;
+      const isNeighborOfFocus = activeSet && activeSet.has(n.id);
+      const dim = focusId && !isFocus && !isNeighborOfFocus;
+
+      const r = nodeRadius(n);
+      let fill = isOrphaned ? '#4a5068' : COMM_COLORS[n.community];
+      let alphaN = isRemoved ? 0.12 : (dim ? 0.18 : (isOrphaned ? 0.65 : 1));
+
+      ctx.globalAlpha = alphaN;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+
+      if (isOrphaned) {
+        ctx.globalAlpha = Math.max(alphaN, 0.75);
+        ctx.strokeStyle = '#9ba3c2';
+        ctx.lineWidth = 1.1;
+        ctx.setLineDash([2, 2]);
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r + 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (isRemoved) {
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#f87171';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(n.x - r * 0.7, n.y - r * 0.7);
+        ctx.lineTo(n.x + r * 0.7, n.y + r * 0.7);
+        ctx.moveTo(n.x + r * 0.7, n.y - r * 0.7);
+        ctx.lineTo(n.x - r * 0.7, n.y + r * 0.7);
+        ctx.stroke();
+      }
+
+      if (isFocus) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#ffb648';
+        ctx.lineWidth = 2 / camScale;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // label only for the focused (clicked/hovered/searched) node -- no
+    // ambient labels otherwise, they just clutter the dense cluster
+    if (focusId) {
+      const n = simById.get(focusId);
+      const fontSize = 13 / camScale;
+      ctx.font = '700 ' + fontSize + 'px Manrope, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      const textY = n.y - nodeRadius(n) - 10 / camScale;
+      const textW = ctx.measureText(focusId).width;
+      const padX = 7 / camScale, padY = 5 / camScale;
+
+      ctx.fillStyle = 'rgba(11,13,20,0.88)';
+      ctx.strokeStyle = 'rgba(255,182,72,0.6)';
+      ctx.lineWidth = 1 / camScale;
+      const bx = n.x - textW / 2 - padX, by = textY - fontSize - padY / 2;
+      const bw = textW + padX * 2, bh = fontSize + padY * 1.6;
+      const r = 4 / camScale;
+      ctx.beginPath();
+      ctx.moveTo(bx + r, by);
+      ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+      ctx.arcTo(bx + bw, by + bh, bx, by + bh, r);
+      ctx.arcTo(bx, by + bh, bx, by, r);
+      ctx.arcTo(bx, by, bx + bw, by, r);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#f4f1ea';
+      ctx.fillText(focusId, n.x, textY);
+    }
+
+    ctx.restore();
+  }
+
+  function loop() {
+    tick();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  renderLegend();
+  renderRemovedList();
+  refreshHud();
+  loop();
+})();
+</script>
